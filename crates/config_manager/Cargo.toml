@@ -1,0 +1,9 @@
+[package]
+name = "config_manager"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+parser = { path = "../parser" }
+notify = "8.0"
+dirs-next = "2.0"

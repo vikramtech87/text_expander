@@ -1,4 +1,10 @@
 use rdev::{Event, EventType, Key};
+use parser::Config;
+
+pub enum AppEvent {
+    KeyEvent(LocalKeyEvent),
+    ConfigUpdate(Config),
+}
 
 pub enum LocalKeyEvent {
     Text(String),
@@ -24,24 +30,3 @@ pub fn parse_rdev_event(event: Event) -> Option<LocalKeyEvent> {
         None
     }
 }
-
-// pub fn handle_expansion(snippets: Vec<ExpansionSnippet>, injector: &mut Injector) {
-//     let trigger_len = 4;
-//     injector.delete_chars(trigger_len);
-//
-//     let mut output_text = String::new();
-//     for snippet in snippets {
-//         match snippet {
-//             ExpansionSnippet::Text { content } => {
-//                 output_text.push_str(&content);
-//             }
-//             ExpansionSnippet::Placeholder { .. }=> {
-//                 output_text.push_str("[Interactive fields coming soon]");
-//             }
-//         }
-//     }
-//
-//     if let Err(e) = injector.inject_text(&output_text) {
-//         eprintln!("Failed to inject text: {:?}", e);
-//     }
-// }

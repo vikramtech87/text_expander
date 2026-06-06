@@ -3,6 +3,7 @@ members = [
     "crates/parser",
     "crates/engine",
     "crates/injector",
+    "crates/config_manager",
     "apps/daemon"
 ]
 resolver = "2"

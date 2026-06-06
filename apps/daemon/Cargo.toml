@@ -7,5 +7,6 @@ edition = "2024"
 parser = { path = "../../crates/parser" }
 engine = { path = "../../crates/engine" }
 injector = { path = "../../crates/injector" }
+config_manager = { path = "../../crates/config_manager" }
 
 rdev = "0.5"

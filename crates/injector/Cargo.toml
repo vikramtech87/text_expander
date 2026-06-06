@@ -1,0 +1,11 @@
+[package]
+name = "injector"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+arboard = "3.4"
+enigo = { version = "0.6", features = ["serde"] }
+
+# [target.'cfg(target_os = "windows")'.dependencies]
+# windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging"] }

@@ -1,0 +1,38 @@
+# --- Rust/Cargo Artifacts ---
+# The target directory contains all compiled binaries, intermediate build artifacts,
+# and debug symbols. It can grow to gigabytes and should never be committed.
+/target/
+
+# --- Backup and Lock Files ---
+# These are generated if a build script modifies files dynamically
+**/*.rs.bk
+
+# --- IDE and Editor Configurations ---
+# Ignore VS Code local settings, workspace files, and extensions
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Ignore IntelliJ / CLion / RustRover metadata
+.idea/
+*.iml
+
+# Ignore macOS system files
+.DS_Store
+
+# --- OS Specific / Build Outputs ---
+# If you ever compile standalone executable binaries or libraries directly to the root
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+
+# --- Configuration & Secrets ---
+# If you decide to add local config files or environment variables later
+.env
+.env.local
+config.local.toml

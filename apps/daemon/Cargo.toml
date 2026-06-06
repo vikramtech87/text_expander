@@ -1,0 +1,11 @@
+[package]
+name = "daemon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+parser = { path = "../../crates/parser" }
+engine = { path = "../../crates/engine" }
+injector = { path = "../../crates/injector" }
+
+rdev = "0.5"

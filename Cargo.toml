@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "crates/parser",
+    "crates/engine",
+    "crates/injector",
+    "apps/daemon"
+]
+resolver = "2"

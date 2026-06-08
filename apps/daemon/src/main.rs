@@ -57,9 +57,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 match key {
                     LocalKeyEvent::Text(text) => {
                         for ch in text.chars() {
-                            if let Some(snippets) = engine.push_char(ch) {
+                            if let Some((snippets, trigger_len)) = engine.push_char(ch) {
                                 // Todo! delete the exact number of characters
-                                injector.delete_chars(7);
+                                injector.delete_chars(trigger_len);
 
                                 let mut output_string = String::new();
                                 for snippet in snippets {

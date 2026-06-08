@@ -24,7 +24,7 @@ impl Engine {
         }
     }
 
-    pub fn push_char(&mut self, ch: char) -> Option<Vec<ExpansionSnippet>> {
+    pub fn push_char(&mut self, ch: char) -> Option<(Vec<ExpansionSnippet>, usize)> {
         self.buffer.push(ch);
 
         // Enforce the rolling buffer constraint: remove old characters from the front
@@ -37,8 +37,10 @@ impl Engine {
 
         for rule in &self.config.rules {
             if self.buffer.ends_with(&rule.trigger) {
+                let trigger_len = rule.trigger.chars().count();
+
                 self.buffer.clear();
-                return Some(rule.expansion.clone());
+                return Some((rule.expansion.clone(), trigger_len));
             }
         }
 
@@ -83,13 +85,14 @@ mod tests {
         let result = engine.push_char('b');
         assert!(result.is_some());
 
-        if let Some(snippets) = result {
+        if let Some((snippets, trigger_len)) = result {
             match &snippets[0] {
                 ExpansionSnippet::Text { content} => {
                     assert_eq!(content, "Be right back!");
                 },
                 _ => panic!("Unexpected snippet type"),
             }
+            assert_eq!(trigger_len, 4);
         }
     }
 

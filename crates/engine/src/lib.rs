@@ -56,6 +56,30 @@ impl Engine {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SnippetSession {
+    pub snippets: Vec<ExpansionSnippet>,
+    pub current_index: usize,
+}
+
+impl SnippetSession {
+    pub fn new(snippets: Vec<ExpansionSnippet>) -> Self {
+        Self {
+            snippets,
+            current_index: 0,
+        }
+    }
+
+    pub fn find_next_placeholder(&self) -> Option<usize> {
+        for i in (self.current_index)..self.snippets.len() {
+            if self.snippets[i].is_placeholder() {
+                return Some(i);
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -12,6 +12,29 @@ pub enum ExpansionSnippet {
     },
 }
 
+impl ExpansionSnippet {
+    pub fn is_placeholder(&self) -> bool {
+        matches!(self, Self::Placeholder { .. })
+    }
+
+    pub fn get_default(&self) -> Option<String> {
+        // Another way of writing
+        // match self {
+        //     Self::Placeholder { default: Some(value), .. } => Some(value.clone()),
+        //     Self::Placeholder { default: None, name } =>
+        //         Some(format!("[[{}]]", name)),
+        //     _ => None,
+        // }
+
+        match self {
+            Self::Placeholder { default, name } => {
+                Some(default.clone().unwrap_or_else(|| format!("[[{}]]", name)))
+            },
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExpansionRule {
     pub trigger: String,

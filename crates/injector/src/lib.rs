@@ -26,19 +26,26 @@ impl Injector {
         thread::sleep(Duration::from_millis(10));
     }
 
-    pub fn inject_text(&mut self, text: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn inject_text(&mut self, txt: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // 0. Normalize the text for legacy windows
+        let normalized_text = if cfg!(target_os = "windows") {
+            txt.replace("\r\n", "\n").replace("\n", "\r\n")
+        } else {
+            txt.to_string()
+        };
+
         // 1. Save the user's current clipboard content so we don't ruin their copy-paste state
         let previous_clipboard = self.clipboard.get_text().ok();
 
         // 2. Set the clipboard to our expanded text
-        self.clipboard.set_text(text.to_string())?;
+        self.clipboard.set_text(normalized_text.clone())?;
 
         // 3. HARDENED FIX: Actively poll the clipboard until the OS confirms
         // the text change is live. Timeout after 150ms.
         let mut verified = false;
         for _ in 0..15 {
             if let Ok(curr) = self.clipboard.get_text() {
-                if curr == text {
+                if curr == normalized_text {
                     verified = true;
                     break;
                 }
@@ -94,5 +101,14 @@ impl Injector {
         }
 
         Ok(())
+    }
+
+    pub fn select_chars_backward(&mut self, count: usize) {
+        let _ = self.enigo.key(Key::Shift, Direction::Press);
+        for _ in 0..count {
+            let _ = self.enigo.key(Key::LeftArrow, Direction::Click);
+            thread::sleep(Duration::from_millis(2));
+        }
+        let _ = self.enigo.key(Key::Shift, Direction::Release);
     }
 }

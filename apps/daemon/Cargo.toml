@@ -3,10 +3,14 @@ name = "daemon"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "textexpander"
+path = "src/main.rs"
+
 [dependencies]
 parser = { path = "../../crates/parser" }
 engine = { path = "../../crates/engine" }
 injector = { path = "../../crates/injector" }
 config_manager = { path = "../../crates/config_manager" }
 
-rdev = "0.5"
+rdev = {  version = "0.5", features = ["unstable_grab"] }

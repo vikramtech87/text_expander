@@ -4,6 +4,7 @@ members = [
     "crates/engine",
     "crates/injector",
     "crates/config_manager",
-    "apps/daemon"
+    "apps/daemon",
+    "apps/csv_parser"
 ]
 resolver = "2"

@@ -3,7 +3,7 @@ use parser::Config;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
-use std::thread;
+use std::{fs, thread};
 use std::time::Duration;
 
 pub struct ConfigManager {
@@ -64,21 +64,36 @@ expansion = [
 pub fn watch_config_file(path: PathBuf, tx: Sender<Config>) -> Result<RecommendedWatcher, Box<dyn Error>> {
     let p = path.clone();
     let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
-         match res {
-             Ok(event) => {
-                 if let EventKind::Modify(_) = event.kind {
-                     thread::sleep(Duration::from_millis(50));
+        let event = match res {
+            Ok(event) => event,
+            Err(e) => {
+                eprintln!("File watcher error: {:?}", e);
+                return;
+            }
+        };
 
-                     if let Ok(content) = std::fs::read_to_string(&p) {
-                         if let Ok(new_config) = Config::parse(&content) {
-                             println!("Configuration changes detected! Hot-reloading rules...");
-                             let _ = tx.send(new_config);
-                         }
-                     }
-                 }
-             }
-             Err(e) => eprintln!("File watcher error: {:?}", e),
-         }
+        if !matches!(event.kind, EventKind::Modify(_)) {
+            return;
+        }
+
+        // 🟢 Debounce step to allow OS write operations to finalize cleanly
+        thread::sleep(Duration::from_millis(50));
+
+        let processing_pipeline = fs::read_to_string(&p)
+            .map_err(|_| "Failed to read configruation file path")
+            .and_then(|content| {
+                // 🟢 Uses your unified parser serialization to decode the rules
+                toml::from_str::<Config>(&content)
+                    .map_err(|_| "Failed to parse TOML formatting")
+            });
+
+        match processing_pipeline {
+            Ok(new_config) => {
+                println!("🔄 Configuration changes detected! Hot-reloading rules...");
+                let _ = tx.send(new_config);
+            }
+            Err(e) => eprintln!("⚠️ Reload abort: {}", e)
+        }
     })?;
 
     watcher.watch(&path, RecursiveMode::NonRecursive)?;

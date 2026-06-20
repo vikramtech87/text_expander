@@ -1,4 +1,4 @@
-use parser::{ExpansionRule, ExpansionSnippet};
+use crate::{ExpansionRule, ExpansionSnippet};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -109,7 +109,7 @@ pub fn rule_to_string(rule: &ExpansionRule) -> String {
 
 #[cfg(test)]
 mod tests {
-    use parser::ExpansionSnippet;
+    use crate::ExpansionSnippet;
     use super::tokenize_expansion;
 
     #[test]

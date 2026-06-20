@@ -1,6 +1,4 @@
-mod utils;
-
-use crate::utils::{rule_to_string, ParserError};
+use parser::utils::{rule_to_string, ParserError, tokenize_expansion};
 use csv::ReaderBuilder;
 use parser::ExpansionRule;
 use std::env;
@@ -28,7 +26,7 @@ fn main() -> Result<(), ParserError> {
         let trigger = record[0].to_owned();
         let expansion = &record[1];
 
-        let snippets = utils::tokenize_expansion(expansion)?;
+        let snippets = tokenize_expansion(expansion)?;
 
         let rule = ExpansionRule {
             trigger,

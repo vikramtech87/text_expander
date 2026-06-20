@@ -1,3 +1,5 @@
+pub mod utils;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -19,14 +21,6 @@ impl ExpansionSnippet {
     }
 
     pub fn get_default(&self) -> Option<String> {
-        // Another way of writing
-        // match self {
-        //     Self::Placeholder { default: Some(value), .. } => Some(value.clone()),
-        //     Self::Placeholder { default: None, name } =>
-        //         Some(format!("[[{}]]", name)),
-        //     _ => None,
-        // }
-
         match self {
             Self::Placeholder { default, name } => {
                 Some(default.clone().unwrap_or_else(|| format!("[[{}]]", name)))

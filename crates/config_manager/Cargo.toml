@@ -7,3 +7,4 @@ edition = "2024"
 parser = { path = "../parser" }
 notify = "8.0"
 dirs-next = "2.0"
+toml = "1.1"

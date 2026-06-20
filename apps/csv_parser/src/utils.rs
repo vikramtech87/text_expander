@@ -1,6 +1,7 @@
 use parser::{ExpansionRule, ExpansionSnippet};
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum ParserError {
     InvalidNumberOfArguments(usize),
     FileAccessError(std::io::Error),

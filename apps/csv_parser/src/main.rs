@@ -20,7 +20,7 @@ fn main() -> Result<(), ParserError> {
 
     let mut compiled_rules = Vec::new();
     for record_result in reader.records() {
-        let record = record_result.map_err(|e| ParserError::CsvInvalid)?;
+        let record = record_result.map_err(|_| ParserError::CsvInvalid)?;
         if record.len() != 2 {
             return Err(ParserError::CsvInvalid);
         }

@@ -1,0 +1,50 @@
+import { ListView, VerticalBox, Button } from "std-widgets.slint";
+import { Palette, LayoutSize } from "Theme.slint";
+
+export component Sidebar inherits VerticalBox {
+    in property <[string]> triggers;
+    callback trigger-selected(int);
+
+    property <int> selected-index: -1;
+
+    width: 200px;
+    spacing: LayoutSize.spacing;
+
+    Button {
+        text: "➕ New Rule";
+        clicked => {
+            root.selected-index = -1;
+            root.trigger-selected(-1);
+        }
+    }
+
+    Text {
+        text: "Triggers";
+        font-weight: 600;
+    }
+
+    ListView {
+        for trigger[idx] in root.triggers : TouchArea {
+            height: 35px;
+
+            clicked => {
+                root.selected-index = idx;
+                root.trigger-selected(idx);
+            }
+
+            Rectangle {
+                background: root.selected-index == idx ? Palette.selection-bg : transparent;
+                border-radius: LayoutSize.border-radius;
+
+                Text {
+                    text: trigger;
+                    vertical-alignment: center;
+                    x: 8px;
+                    color: root.selected-index == idx ? Palette.selection-text : Palette.text-secondary;
+                    font-weight: root.selected-index == idx ? 600 : 400;
+                }
+            }
+
+        }
+    }
+}

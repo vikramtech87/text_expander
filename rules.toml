@@ -1,0 +1,32 @@
+[[rules]]
+trigger = ";brb"
+expansion = [
+	{ type = "text", content = "Be right back!" }
+]
+
+[[rules]]
+trigger = "mest"
+expansion = [
+	{ type = "text", content = "Oxford MEST-C score: M" },
+	{ type = "placeholder", name = "m", default = "0" },
+	{ type = "text", content = " E" },
+	{ type = "placeholder", name = "e", default = "0" },
+	{ type = "text", content = " S" },
+	{ type = "placeholder", name = "s", default = "0" },
+	{ type = "text", content = " T" },
+	{ type = "placeholder", name = "t" },
+	{ type = "text", content = " C" },
+	{ type = "placeholder", name = "c", default = "0" },
+	{ type = "text", content = "." }
+]
+
+[[rules]]
+trigger = "u.ln"
+expansion = [
+	{ type = "placeholder", name = "section" },
+	{ type = "text", content = ": Show" },
+	{ type = "placeholder", name = "s" },
+	{ type = "text", content = " " },
+	{ type = "placeholder", name = "num_lymphnodes" },
+	{ type = "text", content = ", negative for metastases." }
+]

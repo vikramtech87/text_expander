@@ -48,13 +48,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     thread::spawn(move || {
         println!("Global keyboard hook activated. Listening...");
-        // if let Err(error) = listen(move |event| {
-        //     if let Some(key_event) = parse_rdev_event(event) {
-        //         let _ = key_tx.send(AppEvent::KeyEvent(key_event));
-        //     }
-        // }) {
-        //     eprintln!("Failed to start keyboard hook: {:?}", error);
-        // }
 
         let grab_result = grab(move |event| {
             if let EventType::KeyPress(key) = event.event_type {

@@ -1,0 +1,65 @@
+import { Button, VerticalBox, HorizontalBox, LineEdit, TextEdit } from "std-widgets.slint";
+import { Palette, LayoutSize } from "Theme.slint";
+
+export component RuleForm inherits VerticalBox {
+    // 🟢 Two-way properties (like state hooks) to sync input boxes with Rust
+    in-out property <string> trigger;
+    in-out property <string> expansion;
+
+    // 🟢 One-way properties (like props) passed down for display
+    in property <string> validation-error;
+    in property <bool> is-edit-mode: false;
+
+    // 🟢 Event callbacks to alert the parent component
+    callback add-rule-clicked();
+    callback save-clicked();
+    callback trigger-changed(string);
+
+    spacing: LayoutSize.spacing;
+
+    Text { text: "Add New Expansion Rule"; font-weight: 600; }
+
+    HorizontalBox {
+        Text { text: "Trigger:"; vertical-alignment: center; width: 80px; }
+        LineEdit {
+            text <=> root.trigger;
+            placeholder-text: "e.g. ;micro";
+            edited(text) => {
+                root.trigger-changed(text);
+            }
+        }
+    }
+
+    if (root.validation-error != "") : Text {
+        text: root.validation-error;
+        color: Palette.text-error;
+    }
+
+    VerticalBox {
+        spacing: 4px;
+        Text { text: "Expansion:"; font-weight: 500; }
+        TextEdit {
+            text <=> root.expansion;
+            wrap: word-wrap;
+            min-height: 120px;
+        }
+    }
+
+    HorizontalBox {
+        spacing: LayoutSize.spacing;
+
+        if !root.is-edit-mode: Button {
+            text: "➕ Add New Rule";
+            primary: true;
+            enabled: root.validation-error == "" && root.trigger != "" && root.expansion != "";
+            clicked => { root.add-rule-clicked(); }
+        }
+
+        if root.is-edit-mode: Button {
+            text: "💾 Save Changes";
+            primary: true;
+            enabled: root.validation-error == "" && root.trigger != "" && root.expansion != "";
+            clicked => { root.save-clicked(); }
+        }
+    }
+}

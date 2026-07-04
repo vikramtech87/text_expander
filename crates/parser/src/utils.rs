@@ -95,6 +95,28 @@ fn snippet_to_string(snippet: &ExpansionSnippet) -> String {
     }
 }
 
+fn snippet_to_user_friendly(snippet: &ExpansionSnippet) -> String {
+    match &snippet {
+        ExpansionSnippet::Placeholder { name, default: None } => {
+            format!("[[{}]]", name)
+        }
+        ExpansionSnippet::Placeholder { name, default: Some(default) } => {
+            format!("[[{}:{}]]", name, default)
+        }
+        ExpansionSnippet::Text { content } => {
+            content.to_string()
+        }
+    }
+}
+
+pub fn rule_to_user_friendly(rule: &ExpansionRule) -> String {
+    rule.expansion
+        .iter()
+        .map(snippet_to_user_friendly)
+        .collect::<Vec<_>>()
+        .join("")
+}
+
 pub fn rule_to_string(rule: &ExpansionRule) -> String {
     let mut output = format!("[[rules]]\ntrigger = \"{}\"", rule.trigger);
     if !rule.expansion.is_empty() {

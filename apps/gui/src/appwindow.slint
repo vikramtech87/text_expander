@@ -1,0 +1,57 @@
+import { Button, VerticalBox, HorizontalBox, LineEdit, ListView } from "std-widgets.slint";
+import { Sidebar } from "components/Sidebar.slint";
+import { RuleForm } from "components/RuleForm.slint";
+import { LayoutSize } from "components/Theme.slint";
+
+export component AppWindow inherits Window {
+    title: "RTextExpander Rule Manager";
+    min-width: 600px;
+    min-height: 400px;
+
+    // These properties act as the bridge between Rust and the UI
+    in property <[string]> current-triggers;
+    in-out property <string> new-trigger;
+    in-out property <string> new-expansion;
+    in property <string> validation-error;
+    in property <bool> has-selection: false;
+
+    // These callbacks tell Rust when a user does something in the GUI
+    callback add-rule-clicked();
+    callback save-clicked();
+    callback new-trigger-changed(string);
+    callback selected-trigger-changed(int);
+
+    VerticalBox {
+        padding: 15px;
+        spacing: LayoutSize.spacing;
+
+        Text {
+            text: "Text Expander Rules";
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        HorizontalBox {
+            spacing: 15px;
+
+            // Left column: Trigger list view
+            Sidebar {
+                triggers: root.current-triggers;
+                trigger-selected(idx) => { root.selected-trigger-changed(idx); }
+            }
+
+            // Right column: Input form
+            RuleForm  {
+                trigger <=> root.new-trigger;
+                expansion <=> root.new-expansion;
+                validation-error: root.validation-error;
+
+                is-edit-mode: root.has-selection;
+
+                add-rule-clicked => { root.add-rule-clicked(); }
+                save-clicked => { root.save-clicked(); }
+                trigger-changed(text) => { root.new-trigger-changed(text); }
+            }
+        }
+    }
+}

@@ -38,12 +38,6 @@ trigger = ";gme"
 expansion = [
     { type = "text", content = "Gemini is awesome!" }
 ]
-
-[[rules]]
-trigger = ";shrug"
-expansion = [
-    { type = "text", content = '¯\_(ツ)_/¯' }
-]
             "#;
 
             std::fs::write(&self.config_path, default_toml)?;

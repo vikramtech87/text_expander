@@ -5,7 +5,8 @@ edition = "2024"
 
 [dependencies]
 slint = "1.3"
-parser = { path = "../../crates/parser"}
+parser = { path = "../../crates/parser" }
+workspace_config = { path = "../../crates/workspace_config" }
 toml = "1.1"
 
 [build-dependencies]

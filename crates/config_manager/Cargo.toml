@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 parser = { path = "../parser" }
+workspace_config = { path = "../workspace_config" }
 notify = "8.0"
 dirs-next = "2.0"
 toml = "1.1"

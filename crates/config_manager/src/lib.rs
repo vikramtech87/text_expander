@@ -12,15 +12,7 @@ pub struct ConfigManager {
 
 impl ConfigManager {
     pub fn new() -> Result<Self, Box<dyn Error>> {
-        let base_dir = dirs_next::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."));
-
-        let config_dir = base_dir.join("rust_text_expander");
-        let config_path = config_dir.join("rules.toml");
-
-        if !config_dir.exists() {
-            std::fs::create_dir_all(&config_dir)?;
-        }
+        let config_path = workspace_config::get_rules_file()?;
 
         let manager = Self { config_path };
         manager.ensure_default_config_exists()?;

@@ -1,13 +1,13 @@
-use parser::{Config, ExpansionSnippet};
+use rule_codec::models::{RulesConfig, ExpansionSnippet};
 
 pub struct Engine {
-    config: Config,
+    config: RulesConfig,
     buffer: String,
     max_buffer_len: usize,
 }
 
 impl Engine {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: RulesConfig) -> Self {
         let max_trigger_len = config
             .rules
             .iter()
@@ -51,7 +51,7 @@ impl Engine {
         self.buffer.pop();
     }
 
-    pub fn update_config(&mut self, new_config: Config) {
+    pub fn update_config(&mut self, new_config: RulesConfig) {
         self.config = new_config;
     }
 }
@@ -83,10 +83,9 @@ impl SnippetSession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::{ExpansionRule, ExpansionSnippet};
-
+    use rule_codec::models::{ExpansionSnippet, ExpansionRule, RulesConfig};
     fn create_mock_engine() -> Engine {
-        let config = Config {
+        let config = RulesConfig {
             rules: vec![ExpansionRule {
                 trigger: ";brb".to_string(),
                 expansion: vec![ExpansionSnippet::Text {

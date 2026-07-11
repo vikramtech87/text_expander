@@ -2,7 +2,8 @@ use std::{fs, io};
 use std::path::PathBuf;
 
 pub const APP_DIR_NAME: &str = "RTextExpander";
-pub const RULES_FILE_NAME: &str = "rules.toml";
+pub const RULES_FILE_NAME: &str = "rules.rtex";
+pub const RULES_BACKUP_FORMAT: &str = "rules_{}.rtext";
 
 pub fn get_config_dir() -> Result<PathBuf, io::Error> {
     let mut path = dirs_next::config_dir()

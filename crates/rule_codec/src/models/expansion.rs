@@ -4,7 +4,7 @@ use crate::errors::ParseExpansionError;
 use crate::models::ExpansionSnippet;
 
 #[derive(Debug, PartialEq)]
-pub struct Expansion(Vec<ExpansionSnippet>);
+pub struct Expansion(pub Vec<ExpansionSnippet>);
 
 impl FromStr for Expansion {
     type Err = ParseExpansionError;

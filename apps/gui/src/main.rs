@@ -1,24 +1,32 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod controller;
 
-use parser::{Config};
 use slint::{ModelRc, SharedString, VecModel};
 use std::cell::{RefCell};
 use std::{fs};
 use std::rc::Rc;
+use rule_codec::deserialize_rules;
+use rule_codec::models::RulesConfig;
 use crate::controller::AppController;
+
+
 
 slint::include_modules!();
 
 fn main() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
+    let rules = workspace_config::get_rules_file()
+        .map_err(|e| format!("Error reading file {}", e))
+        .and_then(|p| {
+            fs::read(&p).map_err(|e| format!("Error reading file {}", e))
+        })
+        .and_then(|bytes| {
+            deserialize_rules(&bytes)
+                .map_err(|e| format!("Error deserializing file {}", e))
+        }).unwrap_or(Vec::new());
 
-    let config_path = workspace_config::get_rules_file()
-        .unwrap_or("./rules.toml".into());
-
-    let config = fs::read_to_string(config_path)
-        .ok()
-        .and_then(|content| toml::from_str::<Config>(&content).ok())
-        .unwrap_or_else(|| Config { rules: Vec::new() });
+    let config = RulesConfig { rules };
     let shared_config = Rc::new(RefCell::new(config));
 
     let trigger_strings: Vec<SharedString> = shared_config
@@ -58,5 +66,3 @@ fn main() -> Result<(), slint::PlatformError> {
 
     ui.run()
 }
-
-

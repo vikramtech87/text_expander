@@ -1,59 +1,45 @@
+pub mod errors;
+
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use parser::Config;
+use rule_codec::models::RulesConfig;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::{fs, thread};
 use std::time::Duration;
+use rule_codec::deserialize_rules;
+use crate::errors::ConfigError;
 
 pub struct ConfigManager {
     config_path: PathBuf,
 }
 
 impl ConfigManager {
-    pub fn new() -> Result<Self, Box<dyn Error>> {
-        let config_path = workspace_config::get_rules_file()?;
-
-        let manager = Self { config_path };
-        manager.ensure_default_config_exists()?;
-
-        Ok(manager)
+    pub fn new(path: PathBuf) -> Self {
+        Self {
+            config_path: path,
+        }
     }
-
+    
     pub fn path(&self) -> &Path {
         &self.config_path
     }
 
-    pub fn load_config(&self) -> Result<Config, Box<dyn Error>> {
-        let content = std::fs::read_to_string(&self.config_path)?;
-        let config = Config::parse(&content)?;
-        Ok(config)
-    }
+    pub fn load_config(&self) -> Result<RulesConfig, ConfigError> {
+        let bytes = fs::read(&self.config_path)?;
+        let rules = deserialize_rules(&bytes)?;
 
-    fn ensure_default_config_exists(&self) -> Result<(), std::io::Error> {
-        if !self.config_path.exists() {
-            let default_toml = r#"
-[[rules]]
-trigger = ";gme"
-expansion = [
-    { type = "text", content = "Gemini is awesome!" }
-]
-            "#;
-
-            std::fs::write(&self.config_path, default_toml)?;
-            println!("Created default configuration file at {:?}", self.config_path);
-        }
-        Ok(())
+        Ok(RulesConfig { rules })
     }
 }
 
-pub fn watch_config_file(path: PathBuf, tx: Sender<Config>) -> Result<RecommendedWatcher, Box<dyn Error>> {
+pub fn watch_config_file(path: PathBuf, tx: Sender<RulesConfig>) -> Result<RecommendedWatcher, Box<dyn Error>> {
     let p = path.clone();
     let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
         let event = match res {
             Ok(event) => event,
-            Err(e) => {
-                eprintln!("File watcher error: {:?}", e);
+            Err(err) => {
+                eprintln!("Config file watch error: {:?}", err);
                 return;
             }
         };
@@ -62,26 +48,89 @@ pub fn watch_config_file(path: PathBuf, tx: Sender<Config>) -> Result<Recommende
             return;
         }
 
-        // 🟢 Debounce step to allow OS write operations to finalize cleanly
+        // Debounce step to allow OS write operations to finalize cleanly
         thread::sleep(Duration::from_millis(50));
 
-        let processing_pipeline = fs::read_to_string(&p)
-            .map_err(|_| "Failed to read configruation file path")
-            .and_then(|content| {
-                // 🟢 Uses your unified parser serialization to decode the rules
-                toml::from_str::<Config>(&content)
-                    .map_err(|_| "Failed to parse TOML formatting")
-            });
-
-        match processing_pipeline {
-            Ok(new_config) => {
-                println!("🔄 Configuration changes detected! Hot-reloading rules...");
-                let _ = tx.send(new_config);
+        let read_bytes = match fs::read(&p) {
+            Ok(read_bytes) => read_bytes,
+            Err(err) => {
+                eprintln!("[HOT RELOADING] Error reading config file: {:?}", err);
+                return;
             }
-            Err(e) => eprintln!("⚠️ Reload abort: {}", e)
-        }
+        };
+        let rules = match deserialize_rules(&read_bytes) {
+            Ok(rules) => rules,
+            Err(err) => {
+                eprintln!("[HOT RELOADING] Error parsing bytes into rules {:?}", err);
+                return;
+            }
+        };
+
+        println!("🔄 Configuration changes detected! Hot-reloading rules...");
+        let _ = tx.send(RulesConfig { rules });
     })?;
 
     watcher.watch(&path, RecursiveMode::NonRecursive)?;
     Ok(watcher)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use rule_codec::{serialize_rules};
+    use rule_codec::models::{ExpansionRule, ExpansionSnippet};
+    use std::sync::mpsc::channel;
+
+    #[test]
+    fn test_load_config_reads_binary_correctly() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let rtex_path = temp_dir.path().join("rules.rtex");
+
+        let mock_rules = vec![ExpansionRule {
+            trigger: ";test".to_string(),
+            expansion: vec![
+                ExpansionSnippet::Text {
+                    content: "Pass".to_string(),
+                }
+            ]
+        }];
+        let binary_bytes = serialize_rules(&mock_rules);
+        fs::write(&rtex_path, &binary_bytes).unwrap();
+
+        let manager = ConfigManager {
+            config_path: rtex_path,
+        };
+        let loaded_rules = manager.load_config().unwrap();
+
+        assert_eq!(loaded_rules.rules.len(), 1);
+        assert_eq!(loaded_rules.rules[0].trigger, ";test");
+    }
+
+    #[test]
+    fn test_watch_config_file_hot_reloads_binary_changes() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let rtex_path = temp_dir.path().join("rules.rtex");
+
+        fs::write(&rtex_path, &[]).unwrap();
+
+        let (tx, rx) = channel::<RulesConfig>();
+
+        let _watcher = watch_config_file(rtex_path.clone(), tx).unwrap();
+
+        let updated_rules = vec![ExpansionRule {
+            trigger: ";hot".to_string(),
+            expansion: vec![
+                ExpansionSnippet::Text { content: "Reloaded".to_string() }
+            ],
+        }];
+        fs::write(&rtex_path, serialize_rules(&updated_rules)).unwrap();
+
+        let received_rules = rx.recv_timeout(Duration::from_millis(500))
+            .expect("Failed to receive rules");
+
+        assert_eq!(received_rules.rules.len(), 1);
+        assert_eq!(received_rules.rules[0].trigger, ";hot");
+
+    }
 }

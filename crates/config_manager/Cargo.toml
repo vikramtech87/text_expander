@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-parser = { path = "../parser" }
-workspace_config = { path = "../workspace_config" }
+rule_codec = { path = "../rule_codec" }
 notify = "8.0"
-dirs-next = "2.0"
-toml = "1.1"
+
+[dev-dependencies]
+tempfile = "3.27.0"

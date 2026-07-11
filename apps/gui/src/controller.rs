@@ -1,15 +1,16 @@
 use std::cell::{Cell, RefCell};
 use std::{fs, io};
 use std::rc::Rc;
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use slint::{ComponentHandle, Model, SharedString, VecModel, Weak};
-use parser::{Config, ExpansionRule};
-use parser::utils::{rule_to_string, rule_to_user_friendly, tokenize_expansion};
+use rule_codec::{serialize_rules};
+use rule_codec::models::{RulesConfig, ExpansionRule, Expansion};
 use crate::AppWindow;
 
 pub struct AppController {
     ui_weak: Weak<AppWindow>,
-    config: Rc<RefCell<Config>>,
+    config: Rc<RefCell<RulesConfig>>,
     current_ix: Rc<Cell<isize>>,
     triggers: Rc<VecModel<SharedString>>,
 }
@@ -17,7 +18,7 @@ pub struct AppController {
 impl AppController {
     pub fn new(
         ui: &AppWindow,
-        config: Rc<RefCell<Config>>,
+        config: Rc<RefCell<RulesConfig>>,
         triggers: Rc<VecModel<SharedString>>
     ) -> Self {
         Self {
@@ -44,10 +45,11 @@ impl AppController {
         // idx != -1
         let borrowed_config = self.config.borrow();
         let Some(rule) = borrowed_config.rules.get(idx as usize) else { return; };
-        let expansion = rule_to_user_friendly(rule);
+        let expansion = Expansion(rule.expansion.clone());
+        let expansion_str = expansion.to_string();
         ui.set_has_selection(true);
         ui.set_new_trigger(SharedString::from(&rule.trigger).into());
-        ui.set_new_expansion(expansion.into());
+        ui.set_new_expansion(expansion_str.into());
     }
 
     pub fn handle_trigger_input_change(&self, trigger: &str) {
@@ -121,7 +123,7 @@ impl AppController {
             return None;
         }
 
-        let snippets = tokenize_expansion(&raw_expansion);
+        let snippets = Expansion::from_str(&raw_expansion);
         if snippets.is_err() {
             return None;
         }
@@ -129,11 +131,11 @@ impl AppController {
 
         Some(ExpansionRule {
             trigger: raw_trig.trim().into(),
-            expansion: snippets,
+            expansion: snippets.0,
         })
     }
 
-    fn save_to_file(&self, config: &Config) -> Result<(), io::Error> {
+    fn save_to_file(&self, config: &RulesConfig) -> Result<(), io::Error> {
         let target_path = workspace_config::get_rules_file()?;
         let config_dir = workspace_config::get_config_dir()?;
 
@@ -143,20 +145,14 @@ impl AppController {
                 .duration_since(UNIX_EPOCH)
                 .map(|duration| duration.as_secs())
                 .unwrap_or(0);
-            let backup_filename = format!("rules_{}.toml.bak", timestamp);
+            let backup_filename = format!("rules_{}.rtex.bak", timestamp);
             let backup_path = config_dir.join(&backup_filename);
             fs::copy(&target_path, &backup_path)?;
         }
 
         // --- 2. Write to file
-        let toml_string = config
-            .rules
-            .iter()
-            .map(rule_to_string)
-            .collect::<Vec<String>>()
-            .join("\n\n");
-
-        fs::write(&target_path, toml_string)?;
+        let bytes = serialize_rules(&config.rules);
+        fs::write(&target_path, bytes)?;
 
         Ok(())
     }

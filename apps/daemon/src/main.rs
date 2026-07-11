@@ -1,7 +1,7 @@
 use config_manager::{watch_config_file, ConfigManager};
 use engine::{Engine, SnippetSession};
 use injector::Injector;
-use parser::{Config};
+use rule_codec::models::{RulesConfig};
 use rdev::{grab, EventType, Key};
 use std::sync::mpsc;
 use std::thread;
@@ -19,7 +19,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (event_tx, event_rx) = mpsc::channel::<AppEvent>();
 
     // 2. Setup Config Manager and Load Initial Rules.
-    let config_mgr = ConfigManager::new()?;
+    let config_file = workspace_config::get_rules_file()?;
+    let config_mgr = ConfigManager::new(config_file);
     let initial_config = config_mgr.load_config()?;
     let mut engine = Engine::new(initial_config);
     let mut injector = Injector::new()?;
@@ -29,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session_active_flag = Arc::new(AtomicBool::new(false));
 
     // 3. Spawn File Watcher
-    let (cfg_tx, cfg_rx) = mpsc::channel::<Config>();
+    let (cfg_tx, cfg_rx) = mpsc::channel::<RulesConfig>();
     let _watcher = watch_config_file(config_mgr.path().to_path_buf(), cfg_tx)?;
 
     // Let's optimize the watcher linkage. To keep it clean, we can pass our main event_tx

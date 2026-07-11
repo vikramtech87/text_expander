@@ -1,10 +1,10 @@
 use engine::SnippetSession;
 use injector::Injector;
-use parser::{Config, ExpansionSnippet};
+use rule_codec::models::{RulesConfig, ExpansionSnippet};
 
 pub enum AppEvent {
     KeyEvent(LocalKeyEvent),
-    ConfigUpdate(Config),
+    ConfigUpdate(RulesConfig),
 }
 
 pub enum LocalKeyEvent {

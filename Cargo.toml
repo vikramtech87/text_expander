@@ -1,10 +1,10 @@
 [workspace]
 members = [
-    "crates/parser",
     "crates/engine",
     "crates/injector",
     "crates/config_manager",
     "apps/daemon",
-    "apps/csv_parser",
-    "apps/gui", "crates/workspace_config", "crates/rule_codec"]
+    "apps/gui",
+    "crates/workspace_config",
+    "crates/rule_codec"]
 resolver = "2"

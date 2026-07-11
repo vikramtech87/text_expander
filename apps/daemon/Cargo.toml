@@ -8,9 +8,13 @@ name = "textexpander"
 path = "src/main.rs"
 
 [dependencies]
-parser = { path = "../../crates/parser" }
+rule_codec = { path = "../../crates/rule_codec" }
 engine = { path = "../../crates/engine" }
 injector = { path = "../../crates/injector" }
 config_manager = { path = "../../crates/config_manager" }
+workspace_config = { path = "../../crates/workspace_config" }
 
 rdev = {  version = "0.5", features = ["unstable_grab"] }
+
+[build-dependencies]
+embed-resource = "3.0.11"

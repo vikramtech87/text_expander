@@ -5,12 +5,12 @@ edition = "2024"
 
 [dependencies]
 slint = "1.3"
-parser = { path = "../../crates/parser" }
 workspace_config = { path = "../../crates/workspace_config" }
-toml = "1.1"
+rule_codec = { path = "../../crates/rule_codec" }
 
 [build-dependencies]
 slint-build = "1.3"
+embed-resource = "3.0"
 
 [[bin]]
 name = "RTERM"

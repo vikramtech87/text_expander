@@ -1,6 +1,8 @@
 use crate::models::ExpansionSnippet;
+use serde::Deserialize;
 
+#[derive(Debug, PartialEq, Deserialize)]
 pub struct ExpansionRule {
-    trigger: String,
-    expansion: Vec<ExpansionSnippet>,
+    pub trigger: String,
+    pub expansion: Vec<ExpansionSnippet>,
 }

@@ -21,6 +21,7 @@ export component AppWindow inherits Window {
     callback save-clicked();
     callback new-trigger-changed(string);
     callback selected-trigger-changed(int);
+    callback delete-selected-rule();
 
     VerticalBox {
         padding: 15px;
@@ -52,6 +53,7 @@ export component AppWindow inherits Window {
                 add-rule-clicked => { root.add-rule-clicked(); }
                 save-clicked => { root.save-clicked(); }
                 trigger-changed(text) => { root.new-trigger-changed(text); }
+                delete-clicked => { root.delete-selected-rule(); }
             }
         }
     }

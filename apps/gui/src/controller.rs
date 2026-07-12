@@ -118,6 +118,21 @@ impl AppController {
             let _ = self.save_to_file(&borrowed_config);
         }
     }
+
+    pub fn handle_delete_rule(&self) {
+        let curr_ix = self.current_ix.get();
+        if curr_ix < 0 {
+            // No item selected. Nothing to delete.
+            return;
+        }
+        let mut borrowed_config = self.config.borrow_mut();
+        let curr_ix = curr_ix as usize;
+        borrowed_config.rules.remove(curr_ix);
+        self.triggers.remove(curr_ix);
+
+        let _ = self.save_to_file(&borrowed_config);
+    }
+
     fn get_parsed_rule(&self, raw_trig: &str, raw_expansion: String) -> Option<ExpansionRule> {
         if raw_trig.trim().is_empty() || raw_expansion.trim().is_empty() {
             return None;

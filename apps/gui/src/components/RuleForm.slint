@@ -14,6 +14,7 @@ export component RuleForm inherits VerticalBox {
     callback add-rule-clicked();
     callback save-clicked();
     callback trigger-changed(string);
+    callback delete-clicked();
 
     spacing: LayoutSize.spacing;
 
@@ -60,6 +61,11 @@ export component RuleForm inherits VerticalBox {
             primary: true;
             enabled: root.validation-error == "" && root.trigger != "" && root.expansion != "";
             clicked => { root.save-clicked(); }
+        }
+        
+        if root.is-edit-mode: Button {
+            text: "🗑️ Delete Rule";
+            clicked => { root.delete-clicked(); }
         }
     }
 }

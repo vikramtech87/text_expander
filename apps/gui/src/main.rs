@@ -61,7 +61,12 @@ fn main() -> Result<(), slint::PlatformError> {
 
     let c = controller.clone();
     ui.on_save_clicked(move || {
-        c.handle_save_rule()
+        c.handle_save_rule();
+    });
+
+    let c = controller.clone();
+    ui.on_delete_selected_rule(move || {
+        c.handle_delete_rule();
     });
 
     ui.run()

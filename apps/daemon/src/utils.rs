@@ -11,6 +11,7 @@ pub enum LocalKeyEvent {
     Text(String),
     Tab,
     Backspace,
+    Escape,
 }
 
 pub fn advance_session(session: &mut SnippetSession, injector: &mut Injector) {

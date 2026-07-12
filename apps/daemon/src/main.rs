@@ -65,6 +65,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Some(event)
                         }
                     }
+                    // CHANGE: Added to intercept Escape
+                    Key::Escape => {
+                        if hook_flag.load(Ordering::SeqCst) {
+                            let _ = key_tx.send(AppEvent::KeyEvent(LocalKeyEvent::Escape));
+                            None
+                        } else {
+                            Some(event)
+                        }
+                    }
                     _ => {
                         if let Some(actual_text) = event.name.clone() {
                             if !actual_text.is_empty() {
@@ -115,6 +124,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                         }
                     }
+                    // CHANGE: Added escape handler
+                    LocalKeyEvent::Escape => {
+                        session_active_flag.store(false, Ordering::SeqCst);
+                        active_session = None;
+                    }
                     LocalKeyEvent::Backspace => {
                         if active_session.is_none() {
                             engine.handle_backspace();
@@ -125,10 +139,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             advance_session(&mut session, &mut injector);
                             if session.current_index < session.snippets.len() {
                                 active_session = Some(session);
+                                session_active_flag.store(true, Ordering::SeqCst);
                             } else {
                                 // Turn off tab swallowing
                                 session_active_flag.store(false, Ordering::SeqCst);
                             }
+                        } else {
+                            session_active_flag.store(false, Ordering::SeqCst);
                         }
                     }
                 }

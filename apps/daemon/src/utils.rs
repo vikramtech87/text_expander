@@ -25,13 +25,14 @@ pub enum SystemTrayMessage {
     Tray(TrayIconEvent)
 }
 
+#[allow(dead_code)]
 pub struct DaemonApp {
     pub tray_icon: Option<TrayIcon>,
     pub quit_item_id: MenuId,
 }
 
 impl ApplicationHandler<SystemTrayMessage> for DaemonApp {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {}
+    fn resumed(&mut self, _event_loop: &ActiveEventLoop) {}
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: SystemTrayMessage) {
         match event {
@@ -41,13 +42,13 @@ impl ApplicationHandler<SystemTrayMessage> for DaemonApp {
                     event_loop.exit();
                 }
             }
-            SystemTrayMessage::Tray(event) => {
+            SystemTrayMessage::Tray(_event) => {
                 
             }
         }
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {}
+    fn window_event(&mut self, _event_loop: &ActiveEventLoop, _window_id: WindowId, _event: WindowEvent) {}
 }
 
 pub fn advance_session(session: &mut SnippetSession, injector: &mut Injector) {

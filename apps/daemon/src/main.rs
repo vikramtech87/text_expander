@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use config_manager::{watch_config_file, ConfigManager};
 use engine::{Engine, SnippetSession};
 use injector::Injector;
@@ -7,151 +9,192 @@ use std::sync::mpsc;
 use std::thread;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-
-use crate::utils::{advance_session, AppEvent, LocalKeyEvent};
+use crate::utils::{advance_session, load_tray_icon, AppEvent, DaemonApp, LocalKeyEvent, SystemTrayMessage};
+use tray_icon::menu::{Menu, MenuEvent, MenuItem};
+use tray_icon::{TrayIconBuilder, TrayIconEvent};
+use winit::event_loop::EventLoop;
 
 mod utils;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("--- Starting TextExpander Daemon");
+    let event_loop = EventLoop::<SystemTrayMessage>::with_user_event()
+        .build()?;
+    let proxy = event_loop.create_proxy();
 
-    // 1. Initialize our cross-thread channel
-    let (event_tx, event_rx) = mpsc::channel::<AppEvent>();
+    let tray_icon_graphic = load_tray_icon()
+        .expect("Failed to load tray icon");
 
-    // 2. Setup Config Manager and Load Initial Rules.
-    let config_file = workspace_config::get_rules_file()?;
-    let config_mgr = ConfigManager::new(config_file);
-    let initial_config = config_mgr.load_config()?;
-    let mut engine = Engine::new(initial_config);
-    let mut injector = Injector::new()?;
-    let mut active_session: Option<SnippetSession> = None;
+    let tray_menu = Menu::new();
+    let quit_item = MenuItem::new("Quit", true, None);
+    let quit_item_id = quit_item.id().clone();
+    tray_menu.append(&quit_item)?;
 
-    // HARDENDED FIX: Create a thread-safe flag to tell our OS hook whether to swallow Tabs
-    let session_active_flag = Arc::new(AtomicBool::new(false));
+    let tray_icon = TrayIconBuilder::new()
+        .with_menu(Box::new(tray_menu))
+        .with_tooltip("RTEx")
+        .with_icon(tray_icon_graphic)
+        .build()?;
 
-    // 3. Spawn File Watcher
-    let (cfg_tx, cfg_rx) = mpsc::channel::<RulesConfig>();
-    let _watcher = watch_config_file(config_mgr.path().to_path_buf(), cfg_tx)?;
+    let menu_proxy = proxy.clone();
+    MenuEvent::set_event_handler(Some(move |event| {
+        let _ = menu_proxy.send_event(SystemTrayMessage::Menu(event));
+    }));
 
-    // Let's optimize the watcher linkage. To keep it clean, we can pass our main event_tx
-    // directly to a revised watch_config_file hook, or handle it via a proxy thread.
-    // Let's spin up a dedicated proxy channel for config updates to keep libraries clean:
-    let loop_tx = event_tx.clone();
-    thread::spawn(move || {
-        for new_config in cfg_rx {
-            let _ = loop_tx.send(AppEvent::ConfigUpdate(new_config));
-        }
-    });
-
-    // Keyboard listener thread
-    let key_tx = event_tx.clone();
-    let hook_flag = Arc::clone(&session_active_flag);
+    let tray_proxy = proxy.clone();
+    TrayIconEvent::set_event_handler(Some(move |event| {
+        let _ = tray_proxy.send_event(SystemTrayMessage::Tray(event));
+    }));
 
     thread::spawn(move || {
-        println!("Global keyboard hook activated. Listening...");
+        // 1. Initialize our cross-thread channel
+        let (event_tx, event_rx) = mpsc::channel::<AppEvent>();
 
-        let grab_result = grab(move |event| {
-            if let EventType::KeyPress(key) = event.event_type {
-                match key {
-                    Key::Backspace => {
-                        let _ = key_tx.send(AppEvent::KeyEvent(LocalKeyEvent::Backspace));
-                        Some(event)
-                    },
-                    Key::Tab => {
-                        if hook_flag.load(Ordering::SeqCst) {
-                            let _ = key_tx.send(AppEvent::KeyEvent(LocalKeyEvent::Tab));
-                            None // To prevent Tab getting printed in the text
-                        } else {
-                            Some(event)
-                        }
-                    }
-                    // CHANGE: Added to intercept Escape
-                    Key::Escape => {
-                        if hook_flag.load(Ordering::SeqCst) {
-                            let _ = key_tx.send(AppEvent::KeyEvent(LocalKeyEvent::Escape));
-                            None
-                        } else {
-                            Some(event)
-                        }
-                    }
-                    _ => {
-                        if let Some(actual_text) = event.name.clone() {
-                            if !actual_text.is_empty() {
-                                let _ = key_tx.send(AppEvent::KeyEvent(LocalKeyEvent::Text(actual_text)));
-                            }
-                        }
-                        Some(event)
-                    }
-                }
-            } else {
-                Some(event)
+        // 2. Setup Config Manager and Load Initial Rules.
+        let config_file = workspace_config::get_rules_file()
+            .expect("Cannot get the rules filename from config");
+        let config_mgr = ConfigManager::new(config_file);
+        let initial_config = config_mgr.load_config()
+            .expect("Failed to load the initial config");
+        let mut engine = Engine::new(initial_config);
+        let mut injector = Injector::new()
+            .expect("Failed to create injector");
+        let mut active_session: Option<SnippetSession> = None;
+
+        // HARDENDED FIX: Create a thread-safe flag to tell our OS hook whether to swallow Tabs
+        let session_active_flag = Arc::new(AtomicBool::new(false));
+
+        // 3. Spawn File Watcher
+        let (cfg_tx, cfg_rx) = mpsc::channel::<RulesConfig>();
+        let _watcher = watch_config_file(config_mgr.path().to_path_buf(), cfg_tx)
+            .expect("Failed to create watcher");
+
+        // Let's optimize the watcher linkage. To keep it clean, we can pass our main event_tx
+        // directly to a revised watch_config_file hook, or handle it via a proxy thread.
+        // Let's spin up a dedicated proxy channel for config updates to keep libraries clean:
+        let loop_tx = event_tx.clone();
+        thread::spawn(move || {
+            for new_config in cfg_rx {
+                let _ = loop_tx.send(AppEvent::ConfigUpdate(new_config));
             }
         });
 
-        if let Err(error) = grab_result {
-            eprintln!("Failed to start active keyboard grab: {:?}", error);
-        }
-    });
+        // Keyboard listener thread
+        let key_tx = event_tx.clone();
+        let hook_flag = Arc::clone(&session_active_flag);
 
-    for event in event_rx {
-        match event {
-            AppEvent::ConfigUpdate(new_config) => {
-                engine.update_config(new_config);
-            }
-            AppEvent::KeyEvent(key) => {
-                match key {
-                    LocalKeyEvent::Text(text) => {
-                        for ch in text.chars() {
-                            // If a session is active, we don't want to capture keys
-                            if active_session.is_some() {
-                                continue;
+        thread::spawn(move || {
+            println!("Global keyboard hook activated. Listening...");
+
+            let grab_result = grab(move |event| {
+                if let EventType::KeyPress(key) = event.event_type {
+                    match key {
+                        Key::Backspace => {
+                            let _ = key_tx.send(AppEvent::KeyEvent(LocalKeyEvent::Backspace));
+                            Some(event)
+                        },
+                        Key::Tab => {
+                            if hook_flag.load(Ordering::SeqCst) {
+                                let _ = key_tx.send(AppEvent::KeyEvent(LocalKeyEvent::Tab));
+                                None // To prevent Tab getting printed in the text
+                            } else {
+                                Some(event)
                             }
+                        }
+                        // CHANGE: Added to intercept Escape
+                        Key::Escape => {
+                            if hook_flag.load(Ordering::SeqCst) {
+                                let _ = key_tx.send(AppEvent::KeyEvent(LocalKeyEvent::Escape));
+                                None
+                            } else {
+                                Some(event)
+                            }
+                        }
+                        _ => {
+                            if let Some(actual_text) = event.name.clone() {
+                                if !actual_text.is_empty() {
+                                    let _ = key_tx.send(AppEvent::KeyEvent(LocalKeyEvent::Text(actual_text)));
+                                }
+                            }
+                            Some(event)
+                        }
+                    }
+                } else {
+                    Some(event)
+                }
+            });
 
-                            if let Some((snippets, trigger_len)) = engine.push_char(ch) {
-                                // Trigger matched! Create a new session
-                                let mut session = SnippetSession::new(snippets);
+            if let Err(error) = grab_result {
+                eprintln!("Failed to start active keyboard grab: {:?}", error);
+            }
+        });
 
-                                injector.delete_chars(trigger_len);
+        for event in event_rx {
+            match event {
+                AppEvent::ConfigUpdate(new_config) => {
+                    engine.update_config(new_config);
+                }
+                AppEvent::KeyEvent(key) => {
+                    match key {
+                        LocalKeyEvent::Text(text) => {
+                            for ch in text.chars() {
+                                // If a session is active, we don't want to capture keys
+                                if active_session.is_some() {
+                                    continue;
+                                }
 
-                                // Process the snippet parts up to the first placeholder
-                                advance_session(&mut session, &mut injector);
+                                if let Some((snippets, trigger_len)) = engine.push_char(ch) {
+                                    // Trigger matched! Create a new session
+                                    let mut session = SnippetSession::new(snippets);
 
-                                if session.current_index < session.snippets.len() {
-                                    active_session = Some(session);
-                                    // Turn on tab swallowing!
-                                    session_active_flag.store(true, Ordering::SeqCst);
+                                    injector.delete_chars(trigger_len);
+
+                                    // Process the snippet parts up to the first placeholder
+                                    advance_session(&mut session, &mut injector);
+
+                                    if session.current_index < session.snippets.len() {
+                                        active_session = Some(session);
+                                        // Turn on tab swallowing!
+                                        session_active_flag.store(true, Ordering::SeqCst);
+                                    }
                                 }
                             }
                         }
-                    }
-                    // CHANGE: Added escape handler
-                    LocalKeyEvent::Escape => {
-                        session_active_flag.store(false, Ordering::SeqCst);
-                        active_session = None;
-                    }
-                    LocalKeyEvent::Backspace => {
-                        if active_session.is_none() {
-                            engine.handle_backspace();
+                        // CHANGE: Added escape handler
+                        LocalKeyEvent::Escape => {
+                            session_active_flag.store(false, Ordering::SeqCst);
+                            active_session = None;
                         }
-                    }
-                    LocalKeyEvent::Tab => {
-                        if let Some(mut session) = active_session.take() {
-                            advance_session(&mut session, &mut injector);
-                            if session.current_index < session.snippets.len() {
-                                active_session = Some(session);
-                                session_active_flag.store(true, Ordering::SeqCst);
+                        LocalKeyEvent::Backspace => {
+                            if active_session.is_none() {
+                                engine.handle_backspace();
+                            }
+                        }
+                        LocalKeyEvent::Tab => {
+                            if let Some(mut session) = active_session.take() {
+                                advance_session(&mut session, &mut injector);
+                                if session.current_index < session.snippets.len() {
+                                    active_session = Some(session);
+                                    session_active_flag.store(true, Ordering::SeqCst);
+                                } else {
+                                    // Turn off tab swallowing
+                                    session_active_flag.store(false, Ordering::SeqCst);
+                                }
                             } else {
-                                // Turn off tab swallowing
                                 session_active_flag.store(false, Ordering::SeqCst);
                             }
-                        } else {
-                            session_active_flag.store(false, Ordering::SeqCst);
                         }
                     }
                 }
             }
         }
-    }
+    });
+
+    let mut app = DaemonApp {
+        tray_icon: Some(tray_icon),
+        quit_item_id
+    };
+
+    event_loop.run_app(&mut app)?;
 
     Ok(())
 }

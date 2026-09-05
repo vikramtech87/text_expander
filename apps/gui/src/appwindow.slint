@@ -13,6 +13,8 @@ export component AppWindow inherits Window {
     in property <[string]> current-triggers;
     in-out property <string> new-trigger;
     in-out property <string> new-expansion;
+    in-out property <string> filter;
+    in-out property <int> selected-trigger-index;
     in property <string> validation-error;
     in property <bool> has-selection: false;
 
@@ -20,8 +22,9 @@ export component AppWindow inherits Window {
     callback add-rule-clicked();
     callback save-clicked();
     callback new-trigger-changed(string);
-    callback selected-trigger-changed(int);
+    callback selected-trigger-changed();
     callback delete-selected-rule();
+    callback filter-changed();
 
     VerticalBox {
         padding: 15px;
@@ -39,7 +42,10 @@ export component AppWindow inherits Window {
             // Left column: Trigger list view
             Sidebar {
                 triggers: root.current-triggers;
-                trigger-selected(idx) => { root.selected-trigger-changed(idx); }
+                trigger-selected(idx) => { root.selected-trigger-changed(); }
+                filter <=> root.filter;
+                filter-changed(text) => { root.filter-changed(); }
+                selected-index <=> root.selected-trigger-index;
             }
 
             // Right column: Input form

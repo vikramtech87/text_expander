@@ -1,11 +1,14 @@
-import { ListView, VerticalBox, Button } from "std-widgets.slint";
+import { ListView, VerticalBox, Button, LineEdit } from "std-widgets.slint";
 import { Palette, LayoutSize } from "Theme.slint";
 
 export component Sidebar inherits VerticalBox {
-    in property <[string]> triggers;
-    callback trigger-selected(int);
+    in-out property <string> filter;
+    in-out property <int> selected-index;
 
-    property <int> selected-index: -1;
+    in property <[string]> triggers;
+
+    callback trigger-selected(int);
+    callback filter-changed(string);
 
     width: 200px;
     spacing: LayoutSize.spacing;
@@ -21,6 +24,14 @@ export component Sidebar inherits VerticalBox {
     Text {
         text: "Triggers";
         font-weight: 600;
+    }
+
+    LineEdit {
+        placeholder-text: "🔍 Filter by trigger";
+        text <=> root.filter;
+        edited(text) => {
+            root.filter-changed(text)
+        }
     }
 
     ListView {

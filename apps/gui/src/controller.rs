@@ -1,9 +1,9 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::{fs, io};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
-use slint::{ComponentHandle, Model, SharedString, VecModel, Weak};
+use slint::{ComponentHandle, ModelRc, SharedString, VecModel, Weak};
 use rule_codec::{serialize_rules};
 use rule_codec::models::{RulesConfig, ExpansionRule, Expansion};
 use crate::AppWindow;
@@ -11,44 +11,98 @@ use crate::AppWindow;
 pub struct AppController {
     ui_weak: Weak<AppWindow>,
     config: Rc<RefCell<RulesConfig>>,
-    current_ix: Rc<Cell<isize>>,
-    triggers: Rc<VecModel<SharedString>>,
+    filtered: Vec<String>,
 }
 
 impl AppController {
     pub fn new(
         ui: &AppWindow,
         config: Rc<RefCell<RulesConfig>>,
-        triggers: Rc<VecModel<SharedString>>
     ) -> Self {
         Self {
             ui_weak: ui.as_weak(),
             config,
-            current_ix: Rc::new(Cell::new(-1)),
-            triggers,
+            filtered: Vec::new(),
         }
     }
 
-    pub fn handle_selection_change(&self, idx: i32) {
+    fn clear_ui_selection(&self) {
         let Some(ui) = self.ui_weak.upgrade() else { return; };
-        self.current_ix.set(idx as isize);
 
+        ui.set_has_selection(false);
+        ui.set_new_trigger("".into());
+        ui.set_new_expansion("".into());
+        ui.set_selected_trigger_index(-1);
         ui.set_validation_error("".into());
+    }
 
-        if idx == -1 {
-            ui.set_has_selection(false);
-            ui.set_new_trigger("".into());
-            ui.set_new_expansion("".into());
-            return;
+    fn fetch_selected_expansion(&self) -> Option<Expansion> {
+        let Some(trigger) = self.get_selected_trigger() else { return None; };
+
+        self.config
+            .borrow()
+            .rules
+            .iter()
+            .find(|rule| rule.trigger == trigger)
+            .map(|rule| Expansion(rule.expansion.clone()))
+    }
+
+    fn get_selected_trigger(&self) -> Option<String> {
+        let Some(ui) = self.ui_weak.upgrade() else { return None; };
+
+        let selected_idx = ui.get_selected_trigger_index() as isize;
+
+        if selected_idx == -1 {
+            return None;
         }
 
-        // idx != -1
-        let borrowed_config = self.config.borrow();
-        let Some(rule) = borrowed_config.rules.get(idx as usize) else { return; };
-        let expansion = Expansion(rule.expansion.clone());
+        Some(self.filtered[selected_idx as usize].clone())
+    }
+
+    pub fn update_trigger_list(&mut self) {
+        let Some(ui) = self.ui_weak.upgrade() else { return; };
+        let query = ui.get_filter().to_string().trim().to_lowercase();
+
+        self.clear_ui_selection();
+
+        self.filtered = self.config
+            .borrow()
+            .rules
+            .iter()
+            .filter(|rule| {
+                if query.is_empty() {
+                    true
+                } else {
+                    rule.trigger.to_lowercase().contains(&query)
+                }
+            })
+            .map(|rule| rule.trigger.clone())
+            .collect::<Vec<_>>();
+
+        let triggers = self.filtered
+            .iter()
+            .map(SharedString::from)
+            .collect::<Vec<_>>();
+        ui.set_current_triggers(ModelRc::from(Rc::new(VecModel::from(triggers))));
+    }
+
+    pub fn handle_selection_change(&self) {
+        let Some(ui) = self.ui_weak.upgrade() else { return; };
+        ui.set_validation_error("".into());
+
+        let Some(selected_trigger) = self.get_selected_trigger() else {
+            self.clear_ui_selection();
+            return;
+        };
+
+        let Some(expansion) = self.fetch_selected_expansion() else {
+            self.clear_ui_selection();
+            return;
+        };
+
         let expansion_str = expansion.to_string();
         ui.set_has_selection(true);
-        ui.set_new_trigger(SharedString::from(&rule.trigger).into());
+        ui.set_new_trigger(SharedString::from(&selected_trigger).into());
         ui.set_new_expansion(expansion_str.into());
     }
 
@@ -62,11 +116,8 @@ impl AppController {
             return;
         }
 
-        let selected_ix = self.current_ix.get();
-        let selected_trigger = match borrowed_config.rules.get(selected_ix as usize) {
-            Some(rule) => &rule.trigger,
-            None => "",
-        };
+        let selected_trigger = self.get_selected_trigger().unwrap_or_else(|| "".into());
+
         let is_duplicate = borrowed_config.rules
             .iter()
             .any(|rule| rule.trigger == cleaned && rule.trigger != selected_trigger);
@@ -79,58 +130,64 @@ impl AppController {
         ui.set_validation_error(err);
     }
 
-    pub fn handle_add_rule(&self) {
+    pub fn handle_add_rule(&mut self) {
         let Some(ui) = self.ui_weak.upgrade() else { return; };
-        let mut borrowed_config = self.config.borrow_mut();
+
 
         let raw_trigger = ui.get_new_trigger().to_string();
         let raw_expansion = ui.get_new_expansion().to_string();
 
         let Some(new_rule) = self.get_parsed_rule(&raw_trigger, raw_expansion) else { return; };
 
-        borrowed_config.rules.push(new_rule);
-        self.triggers.push(SharedString::from(&raw_trigger));
+        // --- Scoped mutable borrow block --- //
+        {
+            let mut borrowed_config = self.config.borrow_mut();
+            borrowed_config.rules.push(new_rule);
+            let _ = self.save_to_file(&borrowed_config);
+        }
 
-        let _ = self.save_to_file(&borrowed_config);
+        // --- Safe to borrow immutable here --- //
+        self.update_trigger_list();
 
         ui.set_validation_error("".into());
         ui.set_new_trigger("".into());
         ui.set_new_expansion("".into());
     }
 
-    pub fn handle_save_rule(&self) {
+    pub fn handle_save_rule(&mut self) {
         let Some(ui) = self.ui_weak.upgrade() else { return; };
-        let mut borrowed_config = self.config.borrow_mut();
-        let curr_ix = self.current_ix.get();
+        let Some(trigger) = self.get_selected_trigger() else { return; };
 
         let raw_trigger = ui.get_new_trigger().to_string();
         let raw_expansion = ui.get_new_expansion().to_string();
-
         let Some(new_rule) = self.get_parsed_rule(&raw_trigger, raw_expansion) else { return; };
-        if let Some(existing_rule) = borrowed_config.rules.get_mut(curr_ix as usize) {
-            existing_rule.trigger = new_rule.trigger.clone();
-            existing_rule.expansion = new_rule.expansion;
-            self.triggers.set_row_data(
-                curr_ix as usize,
-                SharedString::from(&new_rule.trigger).into(),
-            );
 
-            let _ = self.save_to_file(&borrowed_config);
+        {
+            let mut borrowed_config = self.config.borrow_mut();
+            // Need to find the idx
+            if let Some(existing_rule) = borrowed_config
+                .rules
+                .iter_mut()
+                .find(|rule| rule.trigger == trigger) {
+                    existing_rule.trigger = new_rule.trigger.clone();
+                    existing_rule.expansion = new_rule.expansion;
+                    let _ = self.save_to_file(&borrowed_config);
+                }
         }
+
+        self.update_trigger_list();
     }
 
-    pub fn handle_delete_rule(&self) {
-        let curr_ix = self.current_ix.get();
-        if curr_ix < 0 {
-            // No item selected. Nothing to delete.
-            return;
-        }
-        let mut borrowed_config = self.config.borrow_mut();
-        let curr_ix = curr_ix as usize;
-        borrowed_config.rules.remove(curr_ix);
-        self.triggers.remove(curr_ix);
+    // TODO: Needed to be refactor below
+    pub fn handle_delete_rule(&mut self) {
+        let Some(selected_trigger) = self.get_selected_trigger() else { return; };
 
-        let _ = self.save_to_file(&borrowed_config);
+        {
+            let mut borrowed_config = self.config.borrow_mut();
+            borrowed_config.rules.retain(|rule| rule.trigger != selected_trigger);
+            let _ = self.save_to_file(&borrowed_config);
+        }
+        self.update_trigger_list();
     }
 
     fn get_parsed_rule(&self, raw_trig: &str, raw_expansion: String) -> Option<ExpansionRule> {

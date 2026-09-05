@@ -2,15 +2,12 @@
 
 mod controller;
 
-use slint::{ModelRc, SharedString, VecModel};
 use std::cell::{RefCell};
 use std::{fs};
 use std::rc::Rc;
 use rule_codec::deserialize_rules;
 use rule_codec::models::RulesConfig;
 use crate::controller::AppController;
-
-
 
 slint::include_modules!();
 
@@ -29,44 +26,42 @@ fn main() -> Result<(), slint::PlatformError> {
     let config = RulesConfig { rules };
     let shared_config = Rc::new(RefCell::new(config));
 
-    let trigger_strings: Vec<SharedString> = shared_config
-        .borrow()
-        .rules
-        .iter()
-        .map(|rule| SharedString::from(&rule.trigger))
-        .collect();
-
-    let triggers_model = Rc::new(VecModel::from(trigger_strings));
-    ui.set_current_triggers(ModelRc::from(triggers_model.clone()));
-
     let controller = Rc::new(
-        AppController::new(&ui, shared_config, triggers_model.clone())
+        RefCell::new(AppController::new(&ui, shared_config))
     );
 
+    // Initial call to update the trigger list
+    controller.borrow_mut().update_trigger_list();
+
     let c = controller.clone();
-    ui.on_selected_trigger_changed(move |idx| {
-        c.handle_selection_change(idx);
+    ui.on_filter_changed(move || {
+        c.borrow_mut().update_trigger_list();
+    });
+
+    let c = controller.clone();
+    ui.on_selected_trigger_changed(move || {
+        c.borrow().handle_selection_change();
     });
 
     let c = controller.clone();
     ui.on_new_trigger_changed(move |new_text| {
-        c.handle_trigger_input_change(&new_text);
+        c.borrow().handle_trigger_input_change(&new_text);
     });
 
     let c = controller.clone();
     ui.on_add_rule_clicked(move || {
-       c.handle_add_rule();
+        c.borrow_mut().handle_add_rule();
     });
 
 
     let c = controller.clone();
     ui.on_save_clicked(move || {
-        c.handle_save_rule();
+        c.borrow_mut().handle_save_rule();
     });
 
     let c = controller.clone();
     ui.on_delete_selected_rule(move || {
-        c.handle_delete_rule();
+        c.borrow_mut().handle_delete_rule();
     });
 
     ui.run()

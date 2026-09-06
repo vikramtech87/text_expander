@@ -7,6 +7,7 @@ use slint::{ComponentHandle, ModelRc, SharedString, VecModel, Weak};
 use rule_codec::{serialize_rules};
 use rule_codec::models::{RulesConfig, ExpansionRule, Expansion};
 use crate::AppWindow;
+use crate::validation::{validate_trigger, TriggerValidation};
 
 pub struct AppController {
     ui_weak: Weak<AppWindow>,
@@ -116,16 +117,28 @@ impl AppController {
             return;
         }
 
-        let selected_trigger = self.get_selected_trigger().unwrap_or_else(|| "".into());
+        let selected_trigger = self.get_selected_trigger();
+        let current_trigger_ref = selected_trigger.as_deref();
 
-        let is_duplicate = borrowed_config.rules
+        let existing_triggers: Vec<&str> = borrowed_config.rules
             .iter()
-            .any(|rule| rule.trigger == cleaned && rule.trigger != selected_trigger);
+            .map(|rule| rule.trigger.as_str())
+            .collect();
 
-        let err: SharedString = if is_duplicate {
-            format!("⚠️ Trigger '{}' already exists!", cleaned).into()
-        } else {
-            "".into()
+        let validation = validate_trigger(
+            trigger,
+            &existing_triggers,
+            current_trigger_ref
+        );
+
+        let err: SharedString = match validation {
+            TriggerValidation::Empty => "Trigger cannot be empty".into(),
+            TriggerValidation::ExactMatch => "Trigger already exists".into(),
+            TriggerValidation::Substring { conflicting_trigger } =>
+                format!("{} is substring of existing {}", trigger, conflicting_trigger).into(),
+            TriggerValidation::Superstring { conflicting_trigger } =>
+                format!("{} is superstring of existing {}", trigger, conflicting_trigger).into(),
+            TriggerValidation::Valid => "".into(),
         };
         ui.set_validation_error(err);
     }
